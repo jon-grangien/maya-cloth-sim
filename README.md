@@ -7,3 +7,6 @@ cd build
 cmake ..
 make
 ```
+
+## License
+LGPL
