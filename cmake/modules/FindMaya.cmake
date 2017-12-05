@@ -61,6 +61,7 @@ set(MAYA_INSTALL_BASE_PATH ${MAYA_INSTALL_BASE_DEFAULT} CACHE STRING
     "Root path containing your maya installations, e.g. /usr/autodesk or /Applications/Autodesk/")
 
 set(MAYA_LOCATION ${MAYA_INSTALL_BASE_PATH}/maya${MAYA_VERSION}${MAYA_INSTALL_BASE_SUFFIX})
+message(STATUS "Looking for Maya in ${MAYA_LOCATION}")
 
 # Maya library directory
 find_path(MAYA_LIBRARY_DIR ${OPENMAYA}
@@ -77,6 +78,7 @@ find_path(MAYA_INCLUDE_DIR maya/MFn.h
     PATHS
         ${MAYA_LOCATION}
         $ENV{MAYA_LOCATION}
+		${MAYA_USER_DIR}
     PATH_SUFFIXES
         "${MAYA_INC_SUFFIX}/"
     DOC "Maya include path"

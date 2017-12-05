@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 3.2)
 
-project(Clothsim)
+project("clothsim")
 
 set ( MAYA_PLUGIN_NAME "Mass-spring-cloth" )
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules)
+
+#find_package(Maya REQUIRED)
 
 if(WIN32)
     if(MSVC)
@@ -79,3 +81,5 @@ set_target_properties( ${MAYA_PLUGIN_NAME} PROPERTIES CLEAN_DIRECT_OUTPUT 1 )
 if(WIN32)
 set_target_properties( ${MAYA_PLUGIN_NAME} PROPERTIES LINK_FLAGS "/export:initializePlugin /export:uninitializePlugin" )
 endif()
+
+install(TARGETS ${MAYA_PLUGIN_NAME} RUNTIME DESTINATION ${CMAKE_SOURCE_DIR}/build)
