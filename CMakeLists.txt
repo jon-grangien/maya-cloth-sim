@@ -2,11 +2,12 @@ cmake_minimum_required(VERSION 3.2)
 
 project(Clothsim)
 
-set ( MAYA_PLUGIN_NAME "Mass-spring cloth" )
+set ( MAYA_PLUGIN_NAME "Mass-spring-cloth" )
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules)
 
 if(WIN32)
     if(MSVC)
-        # To enable /MP, parralel build on MSVC
+        # To enable /MP, parallel build on MSVC
         option(WIN32_USE_MP "Set to OFF to diable /MP." ON)
         MARK_AS_ADVANCED(WIN32_USE_MP)
         if(WIN32_USE_MP)
@@ -29,7 +30,7 @@ add_definitions(-D LINUX)
 endif()
 
 # Maya version and architecture (default values)
-set(MAYA_VERSION 2015 CACHE STRING "Maya Version")
+#set(MAYA_VERSION 2015 CACHE STRING "Maya Version")
 set(MAYA_ARCH x64 CACHE STRING "HW Architecture")
 
 if(WIN32)
