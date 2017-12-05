@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.2)
 project("clothsim")
 
 set ( MAYA_PLUGIN_NAME "Mass-spring-cloth" )
-set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules)
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/.cmake/modules)
 
 #find_package(Maya REQUIRED)
 
