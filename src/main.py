@@ -1,8 +1,9 @@
 import sys
 import maya.OpenMaya as OpenMaya
 import maya.OpenMayaMPx as OpenMayaMPx
+import clothsim as sim
 
-kPluginCmdName = "spHelloWorld"
+kPluginCmdName = "clothsim"
 
 # Command
 class scriptedCommand(OpenMayaMPx.MPxCommand):
@@ -11,7 +12,8 @@ class scriptedCommand(OpenMayaMPx.MPxCommand):
         
     # Invoked when the command is run.
     def doIt(self,argList):
-        print "Hello World!"
+        c = sim.clothsim()
+        c.hello()
 
 # Creator
 def cmdCreator():
