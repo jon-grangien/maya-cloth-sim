@@ -7,7 +7,7 @@ Simple interactive cloth simulation using the mass-spring model and verlet integ
 - Set plugin as loaded
 ```python
 import maya.cmds as cmds
-cmds.spHelloWorld()
+cmds.clothsim()
 ```
 - Play button
 
