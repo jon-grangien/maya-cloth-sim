@@ -13,7 +13,7 @@ class scriptedCommand(OpenMayaMPx.MPxCommand):
     # Invoked when the command is run.
     def doIt(self,argList):
         c = sim.clothsim()
-        c.hello()
+        c.run()
 
 # Creator
 def cmdCreator():
