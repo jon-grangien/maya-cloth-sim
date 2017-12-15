@@ -1,5 +1,6 @@
 import pymel.core as pm
 import maya.OpenMayaRender as OpenMayaRender
+import maya.OpenMayaUI as OpenMayaUI #OpenMayaUI.M3dView.active3dView()
 
 # Spring class
 # pos_a: first position
@@ -114,7 +115,8 @@ class Clothsim():
                 self.add_spring( (i * self.sim_u) + j, ((i + 1) * self.sim_u) + j + 1, self.KS_SHEAR, self.SHEAR_SPRING_TYPE)
                 self.add_spring( ((i + 1) * self.sim_u) + j, (i * self.sim_u) + j + 1, self.KS_SHEAR, self.SHEAR_SPRING_TYPE)
 
-    def draw(self):
+    def draw(self, view):
+        view.beginGL()
         self.gl_ft.glColor3f(1, 1, 1)
         self.gl_ft.glBegin(OpenMayaRender.MGL_TRIANGLES)
 
@@ -127,6 +129,7 @@ class Clothsim():
             self.gl_ft.glVertex3f(p_3[0], p_3[1], p_3[2])
 
         self.gl_ft.glEnd()
+        view.endGL()
 
     #def run(self)
         # animation step        
