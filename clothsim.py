@@ -1,6 +1,15 @@
 import pymel.core as pm
-import maya.OpenMayaRender as OpenMayaRender
-import maya.OpenMayaUI as OpenMayaUI #OpenMayaUI.M3dView.active3dView()
+import maya.api.OpenMaya as OpenMaya
+import maya.api.OpenMayaRender as OpenMayaRender
+import maya.OpenMayaRender as V1OpenMayaRender
+import maya.api.OpenMayaUI as OpenMayaUI #OpenMayaUI.M3dView.active3dView()
+
+def maya_useNewAPI():
+	"""
+	The presence of this function tells Maya that the plugin produces, and
+	expects to be passed, objects created using the Maya Python API 2.0.
+	"""
+	pass
 
 # Spring class
 # pos_a: first position
@@ -50,7 +59,7 @@ class Clothsim():
         self.springs = []
 
         # Initialized with Hardware renderer
-        self.gl_renderer = OpenMayaRender.MHardwareRenderer.theRenderer()
+        self.gl_renderer = V1OpenMayaRender.MHardwareRenderer.theRenderer()
 
         # Hold reference to OpenGl fucntion table used by maya
         self.gl_ft = self.gl_renderer.glFunctionTable()
@@ -116,9 +125,12 @@ class Clothsim():
                 self.add_spring( ((i + 1) * self.sim_u) + j, (i * self.sim_u) + j + 1, self.KS_SHEAR, self.SHEAR_SPRING_TYPE)
 
     def draw(self, view):
+        view.drawText( 'Hej', OpenMaya.MPoint(0, 0, -1), OpenMayaUI.M3dView.kCenter ) 
         view.beginGL()
+        self.gl_ft.glPushAttrib( V1OpenMayaRender.MGL_CURRENT_BIT )
+        self.gl_ft.glDisable( V1OpenMayaRender.MGL_CULL_FACE )
         self.gl_ft.glColor3f(1, 1, 1)
-        self.gl_ft.glBegin(OpenMayaRender.MGL_TRIANGLES)
+        self.gl_ft.glBegin(V1OpenMayaRender.MGL_TRIANGLE_FAN)
 
         for i in range(0, len(self.v_indices), 3):
             p_1 = self.vertices[self.v_indices[i]]
@@ -129,7 +141,10 @@ class Clothsim():
             self.gl_ft.glVertex3f(p_3[0], p_3[1], p_3[2])
 
         self.gl_ft.glEnd()
+
+        self.gl_ft.glPopAttrib()
         view.endGL()
+        view.drawText( "Hello", OpenMaya.MPoint( 0.0, 0.0, 0.0 ), OpenMayaUI.M3dView.kCenter )
 
     #def run(self)
         # animation step        
