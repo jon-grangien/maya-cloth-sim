@@ -1,8 +1,11 @@
+import sys
 import pymel.core as pm
 import maya.api.OpenMaya as OpenMaya
 import maya.api.OpenMayaRender as OpenMayaRender
 import maya.OpenMayaRender as V1OpenMayaRender
 import maya.api.OpenMayaUI as OpenMayaUI #OpenMayaUI.M3dView.active3dView()
+
+pluginname = "Clothsim"
 
 def maya_useNewAPI():
 	"""
@@ -29,7 +32,9 @@ class Spring():
 # Simulation class
 # width: width of cloth area
 # height: height of cloth area
-class Clothsim():
+class Clothsim(OpenMayaUI.MPxLocatorNode):
+    id = OpenMaya.MTypeId( 0x80007 )
+
     #cloth_area = [[5,0,0], [-5,0,0], [-1,0,0], [1,0,0]]
     #vertex_density = 0.5
     VERTEX_MASS = 5
@@ -41,9 +46,17 @@ class Clothsim():
     KS_STRUCTURAL = 10
     KS_SHEAR = 13
 
-    # Renderer
+    @staticmethod
+    def creator():
+        return Clothsim(300, 300)
+
+    @staticmethod
+    def initialize():
+        return
+
     def __init__(self, w, h):
         '''clothsim __init__'''
+        OpenMayaUI.MPxLocatorNode.__init__(self)
         self.width = w
         self.height = h
         self.num_x = 10
@@ -148,3 +161,21 @@ class Clothsim():
 
     #def run(self)
         # animation step        
+
+# Initialize the script plug-in
+def initializePlugin(obj):
+    plugin = OpenMaya.MFnPlugin(obj, "Autodesk", "3.0", "Any")
+    try:
+        # plugin.registerCommand(pluginname, "Jonathan")
+        plugin.registerNode("Clothsim", Clothsim.id, Clothsim.creator, Clothsim.initialize, OpenMaya.MPxNode.kLocatorNode)
+    except:
+        sys.stderr.write( "Failed to register node: %s\n" % pluginname )
+        raise
+
+# Uninitialize the script plug-in
+def uninitializePlugin(obj):
+    plugin = OpenMaya.MFnPlugin(obj)
+    try:
+        plugin.deregisterNode(Clothsim.id)
+    except:
+        sys.stderr.write( "Failed to unregister node: %s\n" % pluginname )
