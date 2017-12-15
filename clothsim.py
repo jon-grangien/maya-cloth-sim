@@ -1,4 +1,3 @@
-# import sys
 import pymel.core as pm
 import maya.OpenMayaRender as OpenMayaRender
 
@@ -33,7 +32,7 @@ class Clothsim():
     KS_SHEAR = 13
 
     # Renderer
-    def __init__(self,w,h):
+    def __init__(self, w, h):
         '''clothsim __init__'''
         self.width = w
         self.height = h
@@ -50,10 +49,10 @@ class Clothsim():
         self.springs = []
 
         # Initialized with Hardware renderer
-        self.glRenderer = OpenMayaRender.MHardwareRenderer.theRenderer()
+        self.gl_renderer = OpenMayaRender.MHardwareRenderer.theRenderer()
 
         # Hold reference to OpenGl fucntion table used by maya
-        self.glFT = self.glRenderer.glFunctionTable()
+        self.gl_ft = self.gl_renderer.glFunctionTable()
 
     def add_spring(self, a, b, ks, spring_type):
         s = Spring(a, b, ks, a - b, spring_type)
@@ -62,69 +61,72 @@ class Clothsim():
     def setup(self):
 
         # Calculate initial vertices
+        count = 0
         for i in range(0, self.sim_u):
-            for j in (0, self.sim_v):
+            for j in range(0, self.sim_v):
                 self.vertices.append([((i/(self.sim_u - 1)) * 2 - 1) * self.VERTEX_SIZE_HALF, self.VERTEX_SIZE + 1, ((j/(self.sim_v - 1)) * self.VERTEX_SIZE)])
                 self.v_forces.append([0, 0, 0])
                 self.v_velocities.append([0, 0, 0])
+                count = count + 1
+
+        print("v count: " + str(count))
 
         # Fill in triangle indices
         for i in range(0, self.num_y):
-            for j in range(0, self.num_x + 1):
-                i0 = i * (self.num_x + 1) + j
-                i1 = i0 + 1
-                i2 = i0 + (self.num_x + 1)
-                i3 = i2 + 1
+            for j in range(0, self.num_x):
+                i_0 = i * (self.num_x + 1) + j
+                i_1 = i_0 + 1
+                i_2 = i_0 + (self.num_x + 1)
+                i_3 = i_2 + 1
 
                 if (j+i) % 2:
-                    self.v_indices.append(i0)
-                    self.v_indices.append(i2)
-                    self.v_indices.append(i1)
+                    self.v_indices.append(i_0)
+                    self.v_indices.append(i_2)
+                    self.v_indices.append(i_1)
 
-                    self.v_indices.append(i1)
-                    self.v_indices.append(i2)
-                    self.v_indices.append(i3)
+                    self.v_indices.append(i_1)
+                    self.v_indices.append(i_2)
+                    self.v_indices.append(i_3)
                 else:
-                    self.v_indices.append(i0)
-                    self.v_indices.append(i2)
-                    self.v_indices.append(i3)
+                    self.v_indices.append(i_0)
+                    self.v_indices.append(i_2)
+                    self.v_indices.append(i_3)
 
-                    self.v_indices.append(i0)
-                    self.v_indices.append(i3)
-                    self.v_indices.append(i1)
+                    self.v_indices.append(i_0)
+                    self.v_indices.append(i_3)
+                    self.v_indices.append(i_1)
 
 
         # Add structural springs
         # Horizontal
         for i in range(0, self.sim_v):
-            for j in (0, self.sim_u - 1):
+            for j in range(0, self.sim_u - 1):
                 self.add_spring((i * self.sim_u) + j, (i * self.sim_u) + j + 1, self.KS_STRUCTURAL, self.STRUCTURAL_SPRING_TYPE)
 
         # Vertical
         for i in range(0, self.sim_u):
-            for j in (0, self.sim_v - 1):
+            for j in range(0, self.sim_v - 1):
                 self.add_spring((j * self.sim_u) + i, ((j + 1) * self.sim_u) + i, self.KS_STRUCTURAL, self.STRUCTURAL_SPRING_TYPE)
 
         # Add shear springs
         for i in range(0, self.sim_v - 1):
-            for j in (0, self.sim_u - 1):
-                self.add_spring( (i * self.sim_u) + j, ((i + 1) * self.sim_u) + j + 1, self.KS_SHEAR, self.SHEAR_SPRING_TYPE);
-                self.add_spring( ((i + 1) * self.sim_u) + j, (i * self.sim_u) + j + 1, self.KS_SHEAR, self.SHEAR_SPRING_TYPE);
-        
+            for j in range(0, self.sim_u - 1):
+                self.add_spring( (i * self.sim_u) + j, ((i + 1) * self.sim_u) + j + 1, self.KS_SHEAR, self.SHEAR_SPRING_TYPE)
+                self.add_spring( ((i + 1) * self.sim_u) + j, (i * self.sim_u) + j + 1, self.KS_SHEAR, self.SHEAR_SPRING_TYPE)
 
     def draw(self):
-        self.glFT.glColor3f(1,1,1)
-        self.glFT.glBegin(OpenMayaRender.MGL_TRIANGLES)
+        self.gl_ft.glColor3f(1, 1, 1)
+        self.gl_ft.glBegin(OpenMayaRender.MGL_TRIANGLES)
 
         for i in range(0, len(self.v_indices), 3):
-            p1 = self.vertices[self.v_indices[i]]
-            p2 = self.vertices[self.v_indices[i+1]]
-            p3 = self.vertices[self.v_indices[i+2]]
-            self.glFT.glVertex3f(p1[0], p1[1], p1[2])
-            self.glFT.glVertex3f(p2[0], p2[1], p2[2])
-            self.glFT.glVertex3f(p3[0], p3[1], p3[2])
+            p_1 = self.vertices[self.v_indices[i]]
+            p_2 = self.vertices[self.v_indices[i+1]]
+            p_3 = self.vertices[self.v_indices[i+2]] #index out of range
+            self.gl_ft.glVertex3f(p_1[0], p_1[1], p_1[2])
+            self.gl_ft.glVertex3f(p_2[0], p_2[1], p_2[2])
+            self.gl_ft.glVertex3f(p_3[0], p_3[1], p_3[2])
 
-        self.glFT.glEnd()
+        self.gl_ft.glEnd()
 
     #def run(self)
         # animation step        
