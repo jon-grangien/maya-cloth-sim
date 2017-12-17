@@ -8,11 +8,7 @@ import maya.api.OpenMayaUI as OpenMayaUI #OpenMayaUI.M3dView.active3dView()
 pluginname = "Clothsim"
 
 def maya_useNewAPI():
-	"""
-	The presence of this function tells Maya that the plugin produces, and
-	expects to be passed, objects created using the Maya Python API 2.0.
-	"""
-	pass
+    pass
 
 # Spring class
 # pos_a: first position
@@ -32,7 +28,7 @@ class Spring():
 # Simulation class
 # width: width of cloth area
 # height: height of cloth area
-class Clothsim(OpenMayaUI.MPxLocatorNode):
+class Clothsim():
     id = OpenMaya.MTypeId( 0x80007 )
 
     #cloth_area = [[5,0,0], [-5,0,0], [-1,0,0], [1,0,0]]
@@ -56,7 +52,7 @@ class Clothsim(OpenMayaUI.MPxLocatorNode):
 
     def __init__(self, w, h):
         '''clothsim __init__'''
-        OpenMayaUI.MPxLocatorNode.__init__(self)
+        #OpenMayaUI.MPxLocatorNode.__init__(self)
         self.width = w
         self.height = h
         self.num_x = 10
@@ -84,15 +80,14 @@ class Clothsim(OpenMayaUI.MPxLocatorNode):
     def setup(self):
 
         # Calculate initial vertices
-        count = 0
         for i in range(0, self.sim_u):
             for j in range(0, self.sim_v):
-                self.vertices.append([((i/(self.sim_u - 1)) * 2 - 1) * self.VERTEX_SIZE_HALF, self.VERTEX_SIZE + 1, ((j/(self.sim_v - 1)) * self.VERTEX_SIZE)])
+                self.vertices.append([((i/(self.sim_u - 1)) * 2 - 1) * self.VERTEX_SIZE_HALF, self.VERTEX_SIZE + 1, ((j/(self.sim_v - 1)) * self.VERTEX_SIZE), ''])
                 self.v_forces.append([0, 0, 0])
                 self.v_velocities.append([0, 0, 0])
-                count = count + 1
 
-        print("v count: " + str(count))
+        for i in self.vertices:
+            print(self.vertices[i])
 
         # Fill in triangle indices
         for i in range(0, self.num_y):
@@ -137,7 +132,26 @@ class Clothsim(OpenMayaUI.MPxLocatorNode):
                 self.add_spring( (i * self.sim_u) + j, ((i + 1) * self.sim_u) + j + 1, self.KS_SHEAR, self.SHEAR_SPRING_TYPE)
                 self.add_spring( ((i + 1) * self.sim_u) + j, (i * self.sim_u) + j + 1, self.KS_SHEAR, self.SHEAR_SPRING_TYPE)
 
-    def draw(self, view):
+        # Add spheres at initial vertex positions, put reference name in last field
+        for i in range(0, len(self.v_indices), 3):
+            p_1 = self.vertices[self.v_indices[i]]
+            p_2 = self.vertices[self.v_indices[i+1]]
+            p_3 = self.vertices[self.v_indices[i+2]] 
+
+            sphere = pm.polySphere(sx=10, sy=15, r=0.1)
+            pm.move(p_1[0], p_1[1], p_1[2], sphere[0], ws=True)
+            self.vertices[self.v_indices[i]][3] = sphere[0]
+
+            sphere = pm.polySphere(sx=10, sy=15, r=0.1)
+            pm.move(p_2[0], p_2[1], p_2[2], sphere[0], ws=True)
+            self.vertices[self.v_indices[i+1]][3] = sphere[0]
+
+            sphere = pm.polySphere(sx=10, sy=15, r=0.1)
+            pm.move(p_3[0], p_3[1], p_3[2], sphere[0], ws=True)
+            self.vertices[self.v_indices[i+2]][3] = sphere[0]
+
+    def drawGL(self):
+        view = OpenMayaUI.M3dView.active3dView()
         view.drawText( 'Hej', OpenMaya.MPoint(0, 0, -1), OpenMayaUI.M3dView.kCenter ) 
         view.beginGL()
         self.gl_ft.glPushAttrib( V1OpenMayaRender.MGL_CURRENT_BIT )
@@ -159,23 +173,58 @@ class Clothsim(OpenMayaUI.MPxLocatorNode):
         view.endGL()
         view.drawText( "Hello", OpenMaya.MPoint( 0.0, 0.0, 0.0 ), OpenMayaUI.M3dView.kCenter )
 
+    def draw(self):
+        #plane = pm.polyPlane()
+        #print(plane)
+        #iterations = 20
+
+        #for i in range(iterations):
+        #    pm.setKeyframe(insert=True, value=i)
+
     #def run(self)
         # animation step        
 
-# Initialize the script plug-in
-def initializePlugin(obj):
-    plugin = OpenMaya.MFnPlugin(obj, "Autodesk", "3.0", "Any")
-    try:
-        # plugin.registerCommand(pluginname, "Jonathan")
-        plugin.registerNode("Clothsim", Clothsim.id, Clothsim.creator, Clothsim.initialize, OpenMaya.MPxNode.kLocatorNode)
-    except:
-        sys.stderr.write( "Failed to register node: %s\n" % pluginname )
-        raise
+# Run sim
+#inputGeoTrans = pm.polyPlane(sx=10, sy=10, w=10, h=10, ch = False)[0]
+#inputGeoShape = inputGeoTrans.getShape()
+#pm.select(cl = True)
+#
+#outputGeoTrans = pm.polyPlane( sx=10, sy=10, w=10, h=10, ch = False)[0]
+#outputGeoShape = outputGeoTrans.getShape()
+#pm.select(cl = True)
+#
+## Position constraint locators
+#positionConstraintLocatorIndex0Trans = pm.spaceLocator(n = 'positionConstraintLocatorIndex0')
+#positionConstraintLocatorIndex0Shape = positionConstraintLocatorIndex0Trans.getShape()
+#positionConstraintLocatorIndex0Trans.translate.set(-5,5,5)
+#pm.select(cl = True)
+#
+#positionConstraintLocatorIndex110Trans = pm.spaceLocator(n = 'positionConstraintLocatorIndex110')
+#positionConstraintLocatorIndex110Shape = positionConstraintLocatorIndex110Trans.getShape()
+#positionConstraintLocatorIndex110Trans.translate.set(-5,5,-5)
+#pm.select(cl = True)
+#
+#positionConstraintLocatorIndex120Trans = pm.spaceLocator(n = 'positionConstraintLocatorIndex120')
+#positionConstraintLocatorIndex120Shape = positionConstraintLocatorIndex120Trans.getShape()
+#positionConstraintLocatorIndex120Trans.translate.set(5,5,-5)
+#pm.select(cl = True)
+#
+#positionConstraintLocatorIndex10Trans = pm.spaceLocator(n = 'positionConstraintLocatorIndex10')
+#positionConstraintLocatorIndex10Shape = positionConstraintLocatorIndex10Trans.getShape()
+#positionConstraintLocatorIndex10Trans.translate.set(5,5,5)
+#pm.select(cl = True)
+#
+#positionConstraintLocatorIndex60Trans = pm.spaceLocator(n = 'positionConstraintLocatorIndex60')
+#positionConstraintLocatorIndex60Shape = positionConstraintLocatorIndex60Trans.getShape()
+#positionConstraintLocatorIndex60Trans.translate.set(0,5,0)
+#pm.select(cl = True)
+#
+## Collision sphere
+#collisionSphereTrans = pm.polySphere(sx = 8,sy = 8, n = 'collisionSphere0', r = 2, ch = 0)[0]
+#collisionSphereShape = collisionSphereTrans.getShape()
+#collisionSphereTrans.translate.set(0,1,0)
+#pm.select(cl = True)
 
-# Uninitialize the script plug-in
-def uninitializePlugin(obj):
-    plugin = OpenMaya.MFnPlugin(obj)
-    try:
-        plugin.deregisterNode(Clothsim.id)
-    except:
-        sys.stderr.write( "Failed to unregister node: %s\n" % pluginname )
+sim = Clothsim(300, 300)
+sim.setup()
+sim.draw()
