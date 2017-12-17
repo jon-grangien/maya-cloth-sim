@@ -1,4 +1,4 @@
-import sys
+import sys, math
 import pymel.core as pm
 import maya.api.OpenMaya as OpenMaya
 import maya.api.OpenMayaRender as OpenMayaRender
@@ -18,10 +18,11 @@ def maya_useNewAPI():
 class Spring():
     STIFFNESS = 1
 
-    def __init__(self, a, b, ks, rest_length, spring_type):
+    def __init__(self, a, b, ks, kd, rest_length, spring_type):
         self.pos_a = a
         self.pos_b = b
         self.ks = ks
+        self.kd = kd
         self.rest_length = rest_length
         self.spring_type = spring_type
 
@@ -33,14 +34,17 @@ class Clothsim():
 
     #cloth_area = [[5,0,0], [-5,0,0], [-1,0,0], [1,0,0]]
     #vertex_density = 0.5
-    VERTEX_MASS = 5
+    VERTEX_MASS = 1
     STRUCTURAL_SPRING_TYPE = 0
     SHEAR_SPRING_TYPE = 1
     GRAVITY_FORCE = 9.8
     VERTEX_SIZE = 4
     VERTEX_SIZE_HALF = 2
-    KS_STRUCTURAL = 10
-    KS_SHEAR = 13
+    KS_STRUCTURAL = 50
+    KD_STRUCTURAL = -0.25
+    KS_SHEAR = 50
+    KD_SHEAR = -0.25
+    DEFAULT_DAMPING = -0.0125
 
     @staticmethod
     def creator():
@@ -73,7 +77,7 @@ class Clothsim():
         # Hold reference to OpenGl fucntion table used by maya
         self.gl_ft = self.gl_renderer.glFunctionTable()
 
-    def add_spring(self, a, b, ks, spring_type):
+    def add_spring(self, a, b, ks, kd, spring_type):
         s = Spring(a, b, ks, a - b, spring_type)
         self.springs.append(s)
 
@@ -119,18 +123,18 @@ class Clothsim():
         # Horizontal
         for i in range(0, self.sim_v):
             for j in range(0, self.sim_u - 1):
-                self.add_spring((i * self.sim_u) + j, (i * self.sim_u) + j + 1, self.KS_STRUCTURAL, self.STRUCTURAL_SPRING_TYPE)
+                self.add_spring((i * self.sim_u) + j, (i * self.sim_u) + j + 1, self.KS_STRUCTURAL, self.KD_STRUCTURAL, self.STRUCTURAL_SPRING_TYPE)
 
         # Vertical
         for i in range(0, self.sim_u):
             for j in range(0, self.sim_v - 1):
-                self.add_spring((j * self.sim_u) + i, ((j + 1) * self.sim_u) + i, self.KS_STRUCTURAL, self.STRUCTURAL_SPRING_TYPE)
+                self.add_spring((j * self.sim_u) + i, ((j + 1) * self.sim_u) + i, self.KS_STRUCTURAL, self.KD_STRUCTURAL, self.STRUCTURAL_SPRING_TYPE)
 
         # Add shear springs
         for i in range(0, self.sim_v - 1):
             for j in range(0, self.sim_u - 1):
-                self.add_spring( (i * self.sim_u) + j, ((i + 1) * self.sim_u) + j + 1, self.KS_SHEAR, self.SHEAR_SPRING_TYPE)
-                self.add_spring( ((i + 1) * self.sim_u) + j, (i * self.sim_u) + j + 1, self.KS_SHEAR, self.SHEAR_SPRING_TYPE)
+                self.add_spring( (i * self.sim_u) + j, ((i + 1) * self.sim_u) + j + 1, self.KS_SHEAR, self.KD_SHEAR, self.SHEAR_SPRING_TYPE)
+                self.add_spring( ((i + 1) * self.sim_u) + j, (i * self.sim_u) + j + 1, self.KS_SHEAR, self.KD_SHEAR, self.SHEAR_SPRING_TYPE)
 
         # Add spheres at initial vertex positions, put reference name in last field
         for i in range(0, len(self.v_indices), 3):
@@ -156,7 +160,7 @@ class Clothsim():
     def IntegrateVerlet(self, dt):
         dt_2_mass = (dt * dt) / self.VERTEX_MASS
 
-        for i in range(0, self.total_verts):
+        for i in range(0, len(self.total_verts)):
             buffer = self.vertices[i]
             force = dt_2_mass & self.v_forces[i]
             differenceX = self.vertices[i][0] - self.vertices_last[i][0]
@@ -171,6 +175,62 @@ class Clothsim():
  
         if self.vertices[i][1] < 0:
             self.vertices[i][1] = 0
+
+    def GetVertletVelocity(self, v_i, v_i_last, dt):
+        diffX = v_i[0] - v_i_last[0] / dt
+        diffY = v_i[1] - v_i_last[1] / dt
+        diffZ = v_i[2] - v_i_last[2] / dt
+
+        return [diffX, diffY, diffZ]
+
+    def ComputeForces(self, dt):
+        for i in range(0, len(self.total_verts)):
+            self.v_forces[i] = [0, 0, 0]
+            vel = self.GetVertletVelocity(self.vertices[i], self.vertices_last[i], dt)
+
+            if i != 0 and i != self.num_x:
+                self.v_forces[i][1] += self.GRAVITY_FORCE * self.VERTEX_MASS #y
+
+            self.v_forces[i][0] += self.DEFAULT_DAMPING * vel[0]
+            self.v_forces[i][1] += self.DEFAULT_DAMPING * vel[1]
+            self.v_forces[i][2] += self.DEFAULT_DAMPING * vel[2]
+
+        for i in range(0, len(self.springs)):
+            p_1 = self.vertices[springs[i].pos_a]
+            p_1_last = self.vertices_last[springs[i].pos_a]
+            p_2 = self.vertices[springs[i].pos_b]
+            p_2_last = self.vertices_last[springs[i].pos_b]
+
+            v_1 = self.GetVertletVelocity(p_1, p_1_last, dt)
+            v_2 = self.GetVertletVelocity(p_2, p_2_last, dt)
+
+            delta_p = [0, 0, 0] # p1 - p2
+            delta_p[0] = p_1[0] - p_2[0]
+            delta_p[1] = p_1[1] - p_2[1]
+            delta_p[2] = p_1[2] - p_2[2]
+
+            delta_v = [0, 0, 0] # v1 - v2
+            delta_v[0] = v_1[0] - v_2[0]
+            delta_v[1] = v_1[1] - v_2[1]
+            delta_v[2] = v_1[2] - v_2[2]
+
+            dist = math.sqrt(delta_p[0] * delta_p[0] + delta_p[1] * delta_p[1] + delta_p[2] * delta_p[2])
+            left_term = -self.springs[i].ks * (dist - self.springs[i].rest_length)
+            right_term = self.springs[i].kd * (delta_p[0] * delta_v[0] + delta_p[1] * delta_v[1] + delta_p[2] + delta_v[2])/dist
+            spring_force = [0, 0, 0]
+            spring_force[0] = (left_term + right_term) * (delta_p[0]/dist)
+            spring_force[1] = (left_term + right_term) * (delta_p[1]/dist)
+            spring_force[2] = (left_term + right_term) * (delta_p[2]/dist)
+
+            if self.springs[i].pos_a != 0 and self.springs[i].pos_a != self.num_x:
+                self.v_forces[self.springs[i].pos_a][0] += spring_force[0]
+                self.v_forces[self.springs[i].pos_a][1] += spring_force[1]
+                self.v_forces[self.springs[i].pos_a][2] += spring_force[2]
+
+            if self.springs[i].pos_b != 0 and self.springs[i].pos_b != self.num_x:
+                self.v_forces[self.springs[i].pos_b][0] -= spring_force[0]
+                self.v_forces[self.springs[i].pos_b][1] -= spring_force[1]
+                self.v_forces[self.springs[i].pos_b][2] -= spring_force[2]
 
     def drawGL(self):
         view = OpenMayaUI.M3dView.active3dView()
