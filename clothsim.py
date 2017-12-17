@@ -57,7 +57,7 @@ class Clothsim():
         self.height = h
         self.num_x = 10
         self.num_y = 10
-        #self.total_verts = (num_x+1)*(num_y+1)
+        self.total_verts = (num_x+1)*(num_y+1)
         self.sim_u = self.num_x + 1
         self.sim_v = self.num_y + 1
         
@@ -149,6 +149,28 @@ class Clothsim():
             sphere = pm.polySphere(sx=10, sy=15, r=0.1)
             pm.move(p_3[0], p_3[1], p_3[2], sphere[0], ws=True)
             self.vertices[self.v_indices[i+2]][3] = sphere[0]
+
+        # Last positions list
+        self.vertices_last = self.vertices
+    
+    def IntegrateVerlet(self, dt):
+        dt_2_mass = (dt * dt) / self.VERTEX_MASS
+
+        for i in range(0, self.total_verts):
+            buffer = self.vertices[i]
+            force = dt_2_mass & self.v_forces[i]
+            differenceX = self.vertices[i][0] - self.vertices_last[i][0]
+            differenceY = self.vertices[i][1] - self.vertices_last[i][1]
+            differenceZ = self.vertices[i][2] - self.vertices_last[i][2]
+
+            self.vertices[i][0] = self.vertices[i][0] + differenceX * force
+            self.vertices[i][1] = self.vertices[i][1] + differenceY * force
+            self.vertices[i][2] = self.vertices[i][2] + differenceZ * force
+
+            self.vertices_last[i] = buffer
+ 
+        if self.vertices[i][1] < 0:
+            self.vertices[i][1] = 0
 
     def drawGL(self):
         view = OpenMayaUI.M3dView.active3dView()
