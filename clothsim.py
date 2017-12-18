@@ -6,6 +6,7 @@ import maya.OpenMayaRender as V1OpenMayaRender
 import maya.api.OpenMayaUI as OpenMayaUI #OpenMayaUI.M3dView.active3dView()
 
 plugin_name = "Clothsim"
+collision_sphere_name = ''
 
 SET_KEY_STEP = 4 
 
@@ -291,11 +292,20 @@ class Clothsim():
             pm.move(p_2[0], p_2[1], p_2[2], p_2[3], ws=True)
             pm.move(p_3[0], p_3[1], p_3[2], p_3[3], ws=True)
 
+    def checkCollisionSphere(self):
+        colliding_vertices = pm.collision( collision_sphere_name, q=True )
+
+        for vertex in colliding_vertices:
+            print (vertex)
+            #for i in range(0, len(self.vertices)):
+            #    if vertex
+
     def PhysicsStep(self, dt):
         #print("Physics step dt = " + str(dt))
         self.ComputeForces(dt)
         self.IntegrateVerlet(dt)
         self.UpdatePlaceholderSpheres()
+        self.checkCollisionSphere()
 
     def drawGL(self):
         view = OpenMayaUI.M3dView.active3dView()
@@ -347,6 +357,10 @@ pm.delete()
 sim = Clothsim(300, 300)
 sim.setup()
 sim.draw()
+
+collision_sphere = pm.polySphere(sx=8, sy=8, r=1.0)
+collision_sphere_name = collision_sphere[0]
+pm.move(0, 2, 0, collision_sphere_name, ws=True)
 
 NODES_LIST = pm.ls(regex='pSphere\d+', visible=True, r=True)
 ATTRS_LIST = ("tx", "ty", "tz") 
