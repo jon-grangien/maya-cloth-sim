@@ -36,12 +36,12 @@ class Clothsim():
 
     #cloth_area = [[5,0,0], [-5,0,0], [-1,0,0], [1,0,0]]
     #vertex_density = 0.5
-    VERTEX_MASS = 1.0
+    VERTEX_MASS = 30.0
     STRUCTURAL_SPRING_TYPE = 0
     SHEAR_SPRING_TYPE = 1
     BEND_SPRING_TYPE = 2
 
-    GRAVITY_FORCE = [0,0, -0.0098, 0.0]
+    GRAVITY_FORCE = [0.0, -0.0098, 0.0]
     VERTEX_SIZE = 4
     VERTEX_SIZE_HALF = 2.0
 
@@ -183,11 +183,11 @@ class Clothsim():
 
     
     def IntegrateVerlet(self, dt):
-        dt_2_mass = (dt * dt) / self.VERTEX_MASS
+        dt_2_mass = float(dt * dt) / float(self.VERTEX_MASS)
 
         for i in range(0, self.total_verts):
-            buffer = self.vertices[i]
-            force = [0, 0, 0]
+            buffer = self.vertices[i][:]
+            force = [0.0, 0.0, 0.0]
             force[0] = dt_2_mass * self.v_forces[i][0]
             force[1] = dt_2_mass * self.v_forces[i][1]
             force[2] = dt_2_mass * self.v_forces[i][2]
@@ -200,19 +200,20 @@ class Clothsim():
             self.vertices[i][1] = self.vertices[i][1] + diff_y + force[1]
             self.vertices[i][2] = self.vertices[i][2] + diff_z + force[2]
 
+            #print("diff")
+            #print(str(diff_x) + " " + str(diff_y) + " " + str(diff_z))            
+            #print("force")
+            #print("%.32f" % force[1])
+
             self.vertices_last[i] = buffer
  
-        if self.vertices[i][1] < 0:
+        if self.vertices[i][1] < 0.0:
             self.vertices[i][1] = 0
 
     def GetVertletVelocity(self, v_i, v_i_last, dt):
-        if dt == 0:
-            print("GetVerletVelocity dt 0")
-            return [0,0,0]
-
-        diff_x = (v_i[0] - v_i_last[0]) / dt
-        diff_y = (v_i[1] - v_i_last[1]) / dt
-        diff_z = (v_i[2] - v_i_last[2]) / dt
+        diff_x = (v_i[0] - v_i_last[0]) / float(dt)
+        diff_y = (v_i[1] - v_i_last[1]) / float(dt)
+        diff_z = (v_i[2] - v_i_last[2]) / float(dt)
 
         return [diff_x, diff_y, diff_z]
 
@@ -222,17 +223,21 @@ class Clothsim():
             vel = self.GetVertletVelocity(self.vertices[i], self.vertices_last[i], dt)
 
             if i != 0 and i != self.num_x:
-                self.v_forces[i][1] += self.GRAVITY_FORCE[1] * self.VERTEX_MASS #y
+                self.v_forces[i][1] = 1000.0 * self.GRAVITY_FORCE[1] * float(self.VERTEX_MASS) #y
 
             self.v_forces[i][0] += self.DEFAULT_DAMPING * vel[0]
             self.v_forces[i][1] += self.DEFAULT_DAMPING * vel[1]
             self.v_forces[i][2] += self.DEFAULT_DAMPING * vel[2]
 
+            #print("compute")
+            #print("%.32f" % self.v_forces[i][1])
+            #print("%.32f" % self.GRAVITY_FORCE[1])
+
         for i in range(0, len(self.springs)):
-            p_1 = self.vertices[self.springs[i].pos_a]
-            p_1_last = self.vertices_last[self.springs[i].pos_a]
-            p_2 = self.vertices[self.springs[i].pos_b]
-            p_2_last = self.vertices_last[self.springs[i].pos_b]
+            p_1 = self.vertices[self.springs[i].pos_a][:]
+            p_1_last = self.vertices_last[self.springs[i].pos_a][:]
+            p_2 = self.vertices[self.springs[i].pos_b][:]
+            p_2_last = self.vertices_last[self.springs[i].pos_b][:]
 
             v_1 = self.GetVertletVelocity(p_1, p_1_last, dt)
             v_2 = self.GetVertletVelocity(p_2, p_2_last, dt)
@@ -248,11 +253,10 @@ class Clothsim():
             delta_v[2] = v_1[2] - v_2[2]
 
             dist = math.sqrt(delta_p[0] * delta_p[0] + delta_p[1] * delta_p[1] + delta_p[2] * delta_p[2])
-            dist = 0.01 if dist == 0.0 else dist
             #print("compute forces dist = " + str(dist))
             left_term = -self.springs[i].ks * (dist - self.springs[i].rest_length)
-            right_term = self.springs[i].kd * ((delta_p[0] * delta_v[0] + delta_p[1] * delta_v[1] + delta_p[2] + delta_v[2]) / dist)
-            spring_force = [0, 0, 0]
+            right_term = self.springs[i].kd * ((delta_p[0] * delta_v[0] + delta_p[1] * delta_v[1] + delta_p[2] * delta_v[2]) / dist)
+            spring_force = [0.0, 0.0, 0.0]
             spring_force[0] = (left_term + right_term) * (delta_p[0]/dist)
             spring_force[1] = (left_term + right_term) * (delta_p[1]/dist)
             spring_force[2] = (left_term + right_term) * (delta_p[2]/dist)
@@ -266,20 +270,29 @@ class Clothsim():
                 self.v_forces[self.springs[i].pos_b][0] -= spring_force[0]
                 self.v_forces[self.springs[i].pos_b][1] -= spring_force[1]
                 self.v_forces[self.springs[i].pos_b][2] -= spring_force[2]
-
+            
+            #print("compute end")
+            #print("%.32f" % self.v_forces[i][1])
 
     def UpdatePlaceholderSpheres(self):
         for i in range(0, len(self.v_indices), 3):
-            p_1 = self.vertices[self.v_indices[i]]
-            p_2 = self.vertices[self.v_indices[i+1]]
-            p_3 = self.vertices[self.v_indices[i+2]] 
+            p_1 = self.vertices[self.v_indices[i]][:]
+            p_2 = self.vertices[self.v_indices[i+1]][:]
+            p_3 = self.vertices[self.v_indices[i+2]][:]
+
+            if p_1[1] < 0.0:
+                p_1[1] = 1
+            if p_2[1] < 0.0:
+                p_2[1] = 1
+            if p_3[1] < 0.0:
+                p_2[1] = 1
 
             pm.move(p_1[0], p_1[1], p_1[2], p_1[3], ws=True)
             pm.move(p_2[0], p_2[1], p_2[2], p_2[3], ws=True)
             pm.move(p_3[0], p_3[1], p_3[2], p_3[3], ws=True)
 
     def PhysicsStep(self, dt):
-        print("Physics step dt = " + str(dt))
+        #print("Physics step dt = " + str(dt))
         self.ComputeForces(dt)
         self.IntegrateVerlet(dt)
         self.UpdatePlaceholderSpheres()
@@ -308,7 +321,7 @@ class Clothsim():
         view.drawText( "Hello", OpenMaya.MPoint( 0.0, 0.0, 0.0 ), OpenMayaUI.M3dView.kCenter )
 
     def draw(self):
-        iterations = 30
+        iterations = 40
 
         for i in range(iterations):
             #print(self.TIME_STEP)
