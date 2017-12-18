@@ -5,7 +5,7 @@ import maya.api.OpenMayaRender as OpenMayaRender
 import maya.OpenMayaRender as V1OpenMayaRender
 import maya.api.OpenMayaUI as OpenMayaUI #OpenMayaUI.M3dView.active3dView()
 
-pluginname = "Clothsim"
+plugin_name = "Clothsim"
 
 SET_KEY_STEP = 4 
 
@@ -39,13 +39,19 @@ class Clothsim():
     VERTEX_MASS = 1.0
     STRUCTURAL_SPRING_TYPE = 0
     SHEAR_SPRING_TYPE = 1
-    GRAVITY_FORCE = 9.8
-    VERTEX_SIZE = 4.0
+    BEND_SPRING_TYPE = 2
+
+    GRAVITY_FORCE = [0,0, -0.0098, 0.0]
+    VERTEX_SIZE = 4
     VERTEX_SIZE_HALF = 2.0
-    KS_STRUCTURAL = 50.0
+
+    KS_STRUCTURAL = 50.75
     KD_STRUCTURAL = -0.25
-    KS_SHEAR = 50.0
+    KS_SHEAR = 50.75
     KD_SHEAR = -0.25
+    KS_BEND = 50.95
+    KD_BEND = -0.25
+
     DEFAULT_DAMPING = -0.0125
     TIME_STEP = 1.0 / 24.0
     FPS = 24.0
@@ -66,10 +72,11 @@ class Clothsim():
         self.num_x = 20
         self.num_y = 20
         self.total_verts = (self.num_x+1)*(self.num_y+1)
-        self.sim_u = self.num_x + 1
-        self.sim_v = self.num_y + 1
+        self.sim_u = self.num_y + 1
+        self.sim_v = self.num_x + 1
         
         self.vertices = []
+        self.vertices_last = []
         self.v_forces = []
         self.v_velocities = []
         self.v_indices = []
@@ -87,12 +94,19 @@ class Clothsim():
 
     def setup(self):
 
+        for i in range(0, self.total_verts):
+            self.vertices.append([0,0,0,''])
+            self.vertices_last.append([0,0,0,''])
+            self.v_forces.append([0,0,0])
+            self.vertices.append([0,0,0])
+
         # Calculate initial vertices
+        counter = 0
         for i in range(0, self.sim_u):
             for j in range(0, self.sim_v):
-                self.vertices.append([((i/(self.sim_u - 1)) * 2 - 1) * self.VERTEX_SIZE_HALF, self.VERTEX_SIZE + 1, ((j/(self.sim_v - 1)) * self.VERTEX_SIZE), ''])
-                self.v_forces.append([0, 0, 0])
-                self.v_velocities.append([0, 0, 0])
+                self.vertices[counter] = [((float(i)/(float(self.sim_u) - 1.0)) * 2.0 - 1.0) * self.VERTEX_SIZE_HALF, self.VERTEX_SIZE + 1, ((float(j)/(float(self.sim_v) - 1.0)) * self.VERTEX_SIZE), '']
+                self.vertices_last[counter] = self.vertices[counter]
+                counter = counter + 1
 
         # Fill in triangle indices
         for i in range(0, self.num_y):
@@ -137,6 +151,18 @@ class Clothsim():
                 self.add_spring( (i * self.sim_u) + j, ((i + 1) * self.sim_u) + j + 1, self.KS_SHEAR, self.KD_SHEAR, self.SHEAR_SPRING_TYPE)
                 self.add_spring( ((i + 1) * self.sim_u) + j, (i * self.sim_u) + j + 1, self.KS_SHEAR, self.KD_SHEAR, self.SHEAR_SPRING_TYPE)
 
+        # Add bend strings
+        for i in range(0, self.sim_v ):
+            for j in range(0, self.sim_u - 2):
+                self.add_spring((i * self.sim_u) + j, (i * self.sim_u) + j + 2, self.KS_BEND, self.KD_BEND, self.BEND_SPRING_TYPE)
+            self.add_spring((i * self.sim_u) + (self.sim_u - 3), (i * self.sim_u) + (self.sim_u - 1), self.KS_BEND, self.KD_BEND, self.BEND_SPRING_TYPE)
+                
+        for i in range(0, self.sim_u):
+            for j in range(0, self.sim_v - 2):
+                self.add_spring((j * self.sim_u) + i, ((j + 2) * self.sim_u) + i, self.KS_BEND, self.KD_BEND, self.BEND_SPRING_TYPE)
+            self.add_spring(((self.sim_v - 3) * self.sim_u) + i, ((self.sim_v - 1) * self.sim_u) + i, self.KS_BEND, self.KD_BEND, self.BEND_SPRING_TYPE)
+
+
         # Add spheres at initial vertex positions, put reference name in last field
         for i in range(0, len(self.v_indices), 3):
             p_1 = self.vertices[self.v_indices[i]]
@@ -155,8 +181,6 @@ class Clothsim():
             pm.move(p_3[0], p_3[1], p_3[2], sphere[0], ws=True)
             self.vertices[self.v_indices[i+2]][3] = sphere[0]
 
-        # Last positions list
-        self.vertices_last = self.vertices
     
     def IntegrateVerlet(self, dt):
         dt_2_mass = (dt * dt) / self.VERTEX_MASS
@@ -198,7 +222,7 @@ class Clothsim():
             vel = self.GetVertletVelocity(self.vertices[i], self.vertices_last[i], dt)
 
             if i != 0 and i != self.num_x:
-                self.v_forces[i][1] += self.GRAVITY_FORCE * self.VERTEX_MASS #y
+                self.v_forces[i][1] += self.GRAVITY_FORCE[1] * self.VERTEX_MASS #y
 
             self.v_forces[i][0] += self.DEFAULT_DAMPING * vel[0]
             self.v_forces[i][1] += self.DEFAULT_DAMPING * vel[1]
@@ -225,7 +249,7 @@ class Clothsim():
 
             dist = math.sqrt(delta_p[0] * delta_p[0] + delta_p[1] * delta_p[1] + delta_p[2] * delta_p[2])
             dist = 0.01 if dist == 0.0 else dist
-            print("compute forces dist = " + str(dist))
+            #print("compute forces dist = " + str(dist))
             left_term = -self.springs[i].ks * (dist - self.springs[i].rest_length)
             right_term = self.springs[i].kd * ((delta_p[0] * delta_v[0] + delta_p[1] * delta_v[1] + delta_p[2] + delta_v[2]) / dist)
             spring_force = [0, 0, 0]
@@ -284,7 +308,7 @@ class Clothsim():
         view.drawText( "Hello", OpenMaya.MPoint( 0.0, 0.0, 0.0 ), OpenMayaUI.M3dView.kCenter )
 
     def draw(self):
-        iterations = 50
+        iterations = 30
 
         for i in range(iterations):
             #print(self.TIME_STEP)
@@ -318,6 +342,5 @@ playbackEndTime    = 30
 TIMES_LIST = [i for i in range(playbackStartTime, playbackEndTime+1, SET_KEY_STEP)] #Creates the list 1,5,9,13,17,21...
 
 pm.setKeyframe( NODES_LIST, attribute=ATTRS_LIST, time=TIMES_LIST) #Set all the keys at the same time
-#print result, "keys added."
 
 pm.playbackOptions(ast=playbackStartTime, aet=playbackEndTime, max=playbackEndTime, min=playbackStartTime)
