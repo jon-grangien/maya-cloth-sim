@@ -7,6 +7,8 @@ import maya.api.OpenMayaUI as OpenMayaUI #OpenMayaUI.M3dView.active3dView()
 
 pluginname = "Clothsim"
 
+SET_KEY_STEP = 4 
+
 def maya_useNewAPI():
     pass
 
@@ -34,17 +36,19 @@ class Clothsim():
 
     #cloth_area = [[5,0,0], [-5,0,0], [-1,0,0], [1,0,0]]
     #vertex_density = 0.5
-    VERTEX_MASS = 1
+    VERTEX_MASS = 1.0
     STRUCTURAL_SPRING_TYPE = 0
     SHEAR_SPRING_TYPE = 1
     GRAVITY_FORCE = 9.8
-    VERTEX_SIZE = 4
-    VERTEX_SIZE_HALF = 2
-    KS_STRUCTURAL = 50
+    VERTEX_SIZE = 4.0
+    VERTEX_SIZE_HALF = 2.0
+    KS_STRUCTURAL = 50.0
     KD_STRUCTURAL = -0.25
-    KS_SHEAR = 50
+    KS_SHEAR = 50.0
     KD_SHEAR = -0.25
     DEFAULT_DAMPING = -0.0125
+    TIME_STEP = 1.0 / 24.0
+    FPS = 24.0
 
     @staticmethod
     def creator():
@@ -59,9 +63,9 @@ class Clothsim():
         #OpenMayaUI.MPxLocatorNode.__init__(self)
         self.width = w
         self.height = h
-        self.num_x = 10
-        self.num_y = 10
-        self.total_verts = (num_x+1)*(num_y+1)
+        self.num_x = 20
+        self.num_y = 20
+        self.total_verts = (self.num_x+1)*(self.num_y+1)
         self.sim_u = self.num_x + 1
         self.sim_v = self.num_y + 1
         
@@ -78,7 +82,7 @@ class Clothsim():
         self.gl_ft = self.gl_renderer.glFunctionTable()
 
     def add_spring(self, a, b, ks, kd, spring_type):
-        s = Spring(a, b, ks, a - b, spring_type)
+        s = Spring(a, b, ks, kd, a - b, spring_type)
         self.springs.append(s)
 
     def setup(self):
@@ -89,9 +93,6 @@ class Clothsim():
                 self.vertices.append([((i/(self.sim_u - 1)) * 2 - 1) * self.VERTEX_SIZE_HALF, self.VERTEX_SIZE + 1, ((j/(self.sim_v - 1)) * self.VERTEX_SIZE), ''])
                 self.v_forces.append([0, 0, 0])
                 self.v_velocities.append([0, 0, 0])
-
-        for i in self.vertices:
-            print(self.vertices[i])
 
         # Fill in triangle indices
         for i in range(0, self.num_y):
@@ -142,15 +143,15 @@ class Clothsim():
             p_2 = self.vertices[self.v_indices[i+1]]
             p_3 = self.vertices[self.v_indices[i+2]] 
 
-            sphere = pm.polySphere(sx=10, sy=15, r=0.1)
+            sphere = pm.polySphere(sx=4, sy=4, r=0.1)
             pm.move(p_1[0], p_1[1], p_1[2], sphere[0], ws=True)
             self.vertices[self.v_indices[i]][3] = sphere[0]
 
-            sphere = pm.polySphere(sx=10, sy=15, r=0.1)
+            sphere = pm.polySphere(sx=4, sy=4, r=0.1)
             pm.move(p_2[0], p_2[1], p_2[2], sphere[0], ws=True)
             self.vertices[self.v_indices[i+1]][3] = sphere[0]
 
-            sphere = pm.polySphere(sx=10, sy=15, r=0.1)
+            sphere = pm.polySphere(sx=4, sy=4, r=0.1)
             pm.move(p_3[0], p_3[1], p_3[2], sphere[0], ws=True)
             self.vertices[self.v_indices[i+2]][3] = sphere[0]
 
@@ -160,16 +161,20 @@ class Clothsim():
     def IntegrateVerlet(self, dt):
         dt_2_mass = (dt * dt) / self.VERTEX_MASS
 
-        for i in range(0, len(self.total_verts)):
+        for i in range(0, self.total_verts):
             buffer = self.vertices[i]
-            force = dt_2_mass & self.v_forces[i]
-            differenceX = self.vertices[i][0] - self.vertices_last[i][0]
-            differenceY = self.vertices[i][1] - self.vertices_last[i][1]
-            differenceZ = self.vertices[i][2] - self.vertices_last[i][2]
+            force = [0, 0, 0]
+            force[0] = dt_2_mass * self.v_forces[i][0]
+            force[1] = dt_2_mass * self.v_forces[i][1]
+            force[2] = dt_2_mass * self.v_forces[i][2]
 
-            self.vertices[i][0] = self.vertices[i][0] + differenceX * force
-            self.vertices[i][1] = self.vertices[i][1] + differenceY * force
-            self.vertices[i][2] = self.vertices[i][2] + differenceZ * force
+            diff_x = self.vertices[i][0] - self.vertices_last[i][0]
+            diff_y = self.vertices[i][1] - self.vertices_last[i][1]
+            diff_z = self.vertices[i][2] - self.vertices_last[i][2]
+
+            self.vertices[i][0] = self.vertices[i][0] + diff_x + force[0]
+            self.vertices[i][1] = self.vertices[i][1] + diff_y + force[1]
+            self.vertices[i][2] = self.vertices[i][2] + diff_z + force[2]
 
             self.vertices_last[i] = buffer
  
@@ -177,14 +182,18 @@ class Clothsim():
             self.vertices[i][1] = 0
 
     def GetVertletVelocity(self, v_i, v_i_last, dt):
-        diffX = v_i[0] - v_i_last[0] / dt
-        diffY = v_i[1] - v_i_last[1] / dt
-        diffZ = v_i[2] - v_i_last[2] / dt
+        if dt == 0:
+            print("GetVerletVelocity dt 0")
+            return [0,0,0]
 
-        return [diffX, diffY, diffZ]
+        diff_x = (v_i[0] - v_i_last[0]) / dt
+        diff_y = (v_i[1] - v_i_last[1]) / dt
+        diff_z = (v_i[2] - v_i_last[2]) / dt
+
+        return [diff_x, diff_y, diff_z]
 
     def ComputeForces(self, dt):
-        for i in range(0, len(self.total_verts)):
+        for i in range(0, self.total_verts):
             self.v_forces[i] = [0, 0, 0]
             vel = self.GetVertletVelocity(self.vertices[i], self.vertices_last[i], dt)
 
@@ -196,10 +205,10 @@ class Clothsim():
             self.v_forces[i][2] += self.DEFAULT_DAMPING * vel[2]
 
         for i in range(0, len(self.springs)):
-            p_1 = self.vertices[springs[i].pos_a]
-            p_1_last = self.vertices_last[springs[i].pos_a]
-            p_2 = self.vertices[springs[i].pos_b]
-            p_2_last = self.vertices_last[springs[i].pos_b]
+            p_1 = self.vertices[self.springs[i].pos_a]
+            p_1_last = self.vertices_last[self.springs[i].pos_a]
+            p_2 = self.vertices[self.springs[i].pos_b]
+            p_2_last = self.vertices_last[self.springs[i].pos_b]
 
             v_1 = self.GetVertletVelocity(p_1, p_1_last, dt)
             v_2 = self.GetVertletVelocity(p_2, p_2_last, dt)
@@ -215,8 +224,10 @@ class Clothsim():
             delta_v[2] = v_1[2] - v_2[2]
 
             dist = math.sqrt(delta_p[0] * delta_p[0] + delta_p[1] * delta_p[1] + delta_p[2] * delta_p[2])
+            dist = 0.01 if dist == 0.0 else dist
+            print("compute forces dist = " + str(dist))
             left_term = -self.springs[i].ks * (dist - self.springs[i].rest_length)
-            right_term = self.springs[i].kd * (delta_p[0] * delta_v[0] + delta_p[1] * delta_v[1] + delta_p[2] + delta_v[2])/dist
+            right_term = self.springs[i].kd * ((delta_p[0] * delta_v[0] + delta_p[1] * delta_v[1] + delta_p[2] + delta_v[2]) / dist)
             spring_force = [0, 0, 0]
             spring_force[0] = (left_term + right_term) * (delta_p[0]/dist)
             spring_force[1] = (left_term + right_term) * (delta_p[1]/dist)
@@ -231,6 +242,23 @@ class Clothsim():
                 self.v_forces[self.springs[i].pos_b][0] -= spring_force[0]
                 self.v_forces[self.springs[i].pos_b][1] -= spring_force[1]
                 self.v_forces[self.springs[i].pos_b][2] -= spring_force[2]
+
+
+    def UpdatePlaceholderSpheres(self):
+        for i in range(0, len(self.v_indices), 3):
+            p_1 = self.vertices[self.v_indices[i]]
+            p_2 = self.vertices[self.v_indices[i+1]]
+            p_3 = self.vertices[self.v_indices[i+2]] 
+
+            pm.move(p_1[0], p_1[1], p_1[2], p_1[3], ws=True)
+            pm.move(p_2[0], p_2[1], p_2[2], p_2[3], ws=True)
+            pm.move(p_3[0], p_3[1], p_3[2], p_3[3], ws=True)
+
+    def PhysicsStep(self, dt):
+        print("Physics step dt = " + str(dt))
+        self.ComputeForces(dt)
+        self.IntegrateVerlet(dt)
+        self.UpdatePlaceholderSpheres()
 
     def drawGL(self):
         view = OpenMayaUI.M3dView.active3dView()
@@ -256,57 +284,40 @@ class Clothsim():
         view.drawText( "Hello", OpenMaya.MPoint( 0.0, 0.0, 0.0 ), OpenMayaUI.M3dView.kCenter )
 
     def draw(self):
-        #plane = pm.polyPlane()
-        #print(plane)
-        #iterations = 20
+        iterations = 50
 
-        #for i in range(iterations):
-        #    pm.setKeyframe(insert=True, value=i)
+        for i in range(iterations):
+            #print(self.TIME_STEP)
+            
+            cmds.currentTime(i, edit=True)
+            self.PhysicsStep(self.TIME_STEP)
+            #pm.setKeyframe(insert=True, value=i)
+
+#            objs = pm.ls(regex='pSphere\d+', visible=True, r=True)
+#            for obj in objs:
+#                print(obj)
+#                cmds.setKeyframe(obj, time=i, attribute='translateX')
+#                pm.keyframe(at='tx', query=True, index=i, valueChange=True
+#                cmds.setKeyframe(obj, time=i, attribute='translateY')
+#                cmds.setKeyframe(obj, time=i, attribute='translateZ')
 
     #def run(self)
         # animation step        
 
-# Run sim
-#inputGeoTrans = pm.polyPlane(sx=10, sy=10, w=10, h=10, ch = False)[0]
-#inputGeoShape = inputGeoTrans.getShape()
-#pm.select(cl = True)
-#
-#outputGeoTrans = pm.polyPlane( sx=10, sy=10, w=10, h=10, ch = False)[0]
-#outputGeoShape = outputGeoTrans.getShape()
-#pm.select(cl = True)
-#
-## Position constraint locators
-#positionConstraintLocatorIndex0Trans = pm.spaceLocator(n = 'positionConstraintLocatorIndex0')
-#positionConstraintLocatorIndex0Shape = positionConstraintLocatorIndex0Trans.getShape()
-#positionConstraintLocatorIndex0Trans.translate.set(-5,5,5)
-#pm.select(cl = True)
-#
-#positionConstraintLocatorIndex110Trans = pm.spaceLocator(n = 'positionConstraintLocatorIndex110')
-#positionConstraintLocatorIndex110Shape = positionConstraintLocatorIndex110Trans.getShape()
-#positionConstraintLocatorIndex110Trans.translate.set(-5,5,-5)
-#pm.select(cl = True)
-#
-#positionConstraintLocatorIndex120Trans = pm.spaceLocator(n = 'positionConstraintLocatorIndex120')
-#positionConstraintLocatorIndex120Shape = positionConstraintLocatorIndex120Trans.getShape()
-#positionConstraintLocatorIndex120Trans.translate.set(5,5,-5)
-#pm.select(cl = True)
-#
-#positionConstraintLocatorIndex10Trans = pm.spaceLocator(n = 'positionConstraintLocatorIndex10')
-#positionConstraintLocatorIndex10Shape = positionConstraintLocatorIndex10Trans.getShape()
-#positionConstraintLocatorIndex10Trans.translate.set(5,5,5)
-#pm.select(cl = True)
-#
-#positionConstraintLocatorIndex60Trans = pm.spaceLocator(n = 'positionConstraintLocatorIndex60')
-#positionConstraintLocatorIndex60Shape = positionConstraintLocatorIndex60Trans.getShape()
-#positionConstraintLocatorIndex60Trans.translate.set(0,5,0)
-#pm.select(cl = True)
-#
-## Collision sphere
-#collisionSphereTrans = pm.polySphere(sx = 8,sy = 8, n = 'collisionSphere0', r = 2, ch = 0)[0]
-#collisionSphereShape = collisionSphereTrans.getShape()
-#collisionSphereTrans.translate.set(0,1,0)
-#pm.select(cl = True)
+pm.ls(regex='pSphere\d+', visible=True, r=True)
+pm.delete()
 
 sim = Clothsim(300, 300)
 sim.setup()
 sim.draw()
+
+NODES_LIST = pm.ls(regex='pSphere\d+', visible=True, r=True)
+ATTRS_LIST = ("tx", "ty", "tz") 
+playbackStartTime  = 1
+playbackEndTime    = 30
+TIMES_LIST = [i for i in range(playbackStartTime, playbackEndTime+1, SET_KEY_STEP)] #Creates the list 1,5,9,13,17,21...
+
+pm.setKeyframe( NODES_LIST, attribute=ATTRS_LIST, time=TIMES_LIST) #Set all the keys at the same time
+#print result, "keys added."
+
+pm.playbackOptions(ast=playbackStartTime, aet=playbackEndTime, max=playbackEndTime, min=playbackStartTime)
